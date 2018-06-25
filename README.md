@@ -64,10 +64,12 @@ You also need a hosts file looks like
 
 ## NFS infrastructure
 ## Configure NFS server
+*Note: see https://www.server-world.info/en/note?os=CentOS_7&p=nfs*
 ```bash
 [root@k8s-cluster-1 ~]# echo "/mnt *(rw,no_root_squash)" > /etc/exports
 [root@k8s-cluster-1 ~]# systemctl enable rpcbind nfs-server
 [root@k8s-cluster-1 ~]# systemctl restart rpcbind nfs-server
+[root@k8s-cluster-1 ~]# mkdir /mnt/binderhub
 ```
 **Warning: You should be careful with /etc/exports syntax. You should NOT have space between options**
 
@@ -81,6 +83,7 @@ You also need a hosts file looks like
 
 ## Configure kubernetes
 ### Installing docker (k8s-cluster-2 to k8s-cluster-5)
+*Note: see https://docs.docker.com/install/linux/docker-ce/centos/#install-docker-ce*
 ```bash
 [root@k8s-cluster-<id 2+> ~]#  yum install -y yum-utils \
   device-mapper-persistent-data \
@@ -123,6 +126,7 @@ For more examples and ideas, visit:
  https://docs.docker.com/engine/userguide/
 ```
 ### Configure kubernetes
+*Note: see https://kubernetes.io/docs/tasks/tools/install-kubeadm/*
 #### Common
 ```bash
 [root@k8s-cluster-<id 2+> ~]#  cat <<EOF > /etc/yum.repos.d/kubernetes.repo
@@ -146,6 +150,7 @@ EOF
 ```
 
 #### Master
+*Note: see https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/*
 ```bash
 [root@k8s-cluster-2 ~]# kubeadm init --pod-network-cidr=10.244.0.0/16
 Your Kubernetes master has initialized successfully!
@@ -179,10 +184,152 @@ k8s-cluster-2.lal.in2p3.fr   Ready      master    18m       v1.10.5
 [root@k8s-cluster-<id 3+> ~]# kubeadm join 192.168.10.11:6443 --token <token> --discovery-token-ca-cert-hash sha256:<sha>
 ```
 
-## Configure binderhub
+#### Verify kubernetes installation (kubernetes master)
+*Note: Every command will now be launch on kubernetes master. There is no need to connect to k8s nodes*
 ```bash
+[root@k8s-cluster-2 ~]# kubectl get node
+NAME                         STATUS    ROLES     AGE       VERSION
+k8s-cluster-2.lal.in2p3.fr   Ready     master    24m       v1.10.5
+k8s-cluster-3.lal.in2p3.fr   Ready     <none>    7m        v1.10.5
+k8s-cluster-4.lal.in2p3.fr   Ready     <none>    5m        v1.10.5
+k8s-cluster-5.lal.in2p3.fr   Ready     <none>    7m        v1.10.5
+```
+
+## Configure binderhub
+*Note: see https://binderhub.readthedocs.io/en/latest/*
+*Note: every command will be launch on k8s master*
+
+### Kubernetes initialisation
+```bash
+[root@k8s-cluster-2 ~]# export PATH=$PATH:/usr/local/bin # You can add it in .bashrc
+[root@k8s-cluster-2 ~]# curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
+[root@k8s-cluster-2 ~]# kubectl --namespace kube-system create serviceaccount tiller
+[root@k8s-cluster-2 ~]# kubectl create clusterrolebinding tiller --clusterrole cluster-admin --serviceaccount=kube-system:tiller
+[root@k8s-cluster-2 ~]# helm init --service-account tiller
+
+
+[root@k8s-cluster-2 ~]# # Test helm installation
+[root@k8s-cluster-2 ~]# helm version
+[root@k8s-cluster-2 ~]# kubectl --namespace=kube-system patch deployment tiller-deploy --type=json --patch='[{"op": "add", "path": "/spec/template/spec/containers/0/command", "value": ["/tiller", "--listen=localhost:44134"]}]'
+```
+### Binderhub configuration files
+```bash
+[root@k8s-cluster-2 ~]# mkdir binderhub
+[root@k8s-cluster-2 ~]# cd binderhub
+[root@k8s-cluster-2 ~]# openssl rand -hex 32 > apiToken.txt
+[root@k8s-cluster-2 ~]# openssl rand -hex 32 > secretToken.txt
+```
+#### Secret.yaml
+```yaml
+jupyterhub:
+    hub:
+      services:
+        binder:
+          apiToken: "<content of apiToken.txt>"
+    proxy:
+      secretToken: "<content of secretToken.txt>"
+hub:
+  services:
+    binder:
+      apiToken: "<content of apiToken.txt>"
+registry:
+  username: dockerhub-username
+  password: dockerhub-password
+```
+
+#### Config.yaml
+```yaml
+registry:
+  enabled: true
+  prefix: registry.hub.docker.com/sinese
+  host: https://registry.hub.docker.com
+  authHost: https://index.docker.io/v1
+  authTokenUrl: https://auth.docker.io/token?service=registry.docker.io
+hub:
+  url: http://192.168.10.14:8080
+repo2dockerImage: jupyter/repo2docker:2dc4874
+baseUrl: /
+jupyterhub:
+  hub:
+    proxy:
+      service:
+        type: NodePort
+binderhub:
+  service:
+    type: NodePort
+```
+#### Load binderhub
+```bash
+[root@k8s-cluster-2 ~]# helm repo add jupyterhub https://jupyterhub.github.io/helm-chart
+[root@k8s-cluster-2 ~]# helm repo update
+[root@k8s-cluster-2 ~]# helm install jupyterhub/binderhub --version=v0.1.0-856e3e6  --name=binder  -f secret.yaml -f config.yaml
+```
+Change LoadBalancer to NodePort for service/binder and service/proxy
+*Note: Should be done by config.yaml*
+```bash
+[root@k8s-cluster-2 ~]# kubectl edit service/binder
+# Change type: LoadBalancer to NodePort
+[root@k8s-cluster-2 ~]# kubectl edit service/binder
+# Change type: LoadBalancer to NodePort
+```
+
+We now need to create a persistent volume claim for hub pod. Create a file hub-db-dir.yaml
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: binder
+spec:
+  accessModes:
+  - ReadWriteOnce
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  nfs:
+    server: 192.168.10.14
+    path: "/mnt/binder"
+```
+And now launch it
+```bash
+[root@k8s-cluster-2 ~]# kubectl apply -f hub-db-dir.yaml
 ```
 
 ## Configure haproxy
+We now need to configure haproxy to access to binderhub. On k8s master note proxy-public and binder port used
 ```bash
+[root@k8s-cluster-2 ~]# kubectl get service | grep 'binder\|public''
+binder         NodePort    10.100.212.148   <none>        80:30896/TCP   12m
+proxy-public   NodePort    10.109.153.126   <none>        80:31058/TCP   12m
+```
+binder port is bound to **30896** and proxy is bound to **31058**
+
+on k8s-cluster-1 configure /etc/haproxy/haproxy.conf
+```ini
+# Simple configuration for an HTTP proxy listening on port 80 on all
+    # interfaces and forwarding requests to a single backend "servers" with a
+    # single server "server1" listening on 127.0.0.1:8000
+    global
+        daemon
+        maxconn 256
+
+    defaults
+        mode http
+        timeout connect 5000ms
+        timeout client 50000ms
+        timeout server 50000ms
+
+    listen http-in
+        bind *:80
+        server server1 192.168.10.10:30896 maxconn 32
+
+   listen http-in
+        bind *:8080
+        server server1 192.168.10.10:31058 maxconn 32
+```
+*Note: To have a HAproxy, you need to add all node IP. With this configuration, all traffic will be sent to k8s-cluster-5, but all k8s node is a valid service*
+
+and restart haproxy
+```bash
+[root@k8s-cluster-1 ~]# systemctl enable haproxy
+[root@k8s-cluster-1 ~]# systemctl restart haproxy
 ```
