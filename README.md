@@ -303,6 +303,11 @@ proxy-public   NodePort    10.109.153.126   <none>        80:31058/TCP   12m
 ```
 binder port is bound to **30896** and proxy is bound to **31058**
 
+on k8s-cluster-1 install haproxy
+```bash
+[root@k8s-cluster-1 ~]# yum install -y haproxy
+```
+
 on k8s-cluster-1 configure /etc/haproxy/haproxy.conf
 ```ini
 # Simple configuration for an HTTP proxy listening on port 80 on all
