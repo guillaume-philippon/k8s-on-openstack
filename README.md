@@ -1,8 +1,9 @@
 # k8s-on-openstack
 
+## Start OpenStack Virtual Machine
 *Note: Starting VM and retrieve information about can be done on keystone portal instead of CLI interface*
 
-## Check your openstack environnement
+  ### Check your openstack environnement
 ```bash
 box:~ user$ openstack keypair list
 +-----------------------------+-------------------------------------------------+
@@ -12,12 +13,12 @@ box:~ user$ openstack keypair list
 +-----------------------------+-------------------------------------------------+
 ```
 
-## Start 5 VMs
+  ### Start 5 VMs
 ```bash
 box:~ user$ openstack server create --image CentOS-7-x86_64-GenericCloud-1802 --min 5 --max 5 --network public --flavor os.2 --key-name <your-ssh-key-on-openstack> k8s-cluster
 ```
 
-## Retrieve VMs IP
+  ### Retrieve VMs IP
 ```bash
 box:~ user$ openstack server list
 +--------------------------------------+---------------+--------+-----------------------+-----------------------------------+--------+
@@ -31,14 +32,14 @@ box:~ user$ openstack server list
 +--------------------------------------+---------------+--------+-----------------------+-----------------------------------+--------+
 ```
 
-## Define role for your VM
+  ### Define role for your VM
   * k8s-cluster-1 (192.168.10.14) : NFS server + haproxy
   * k8s-cluster-2 (192.168.10.13): kubernetes master
   * k8s-cluster-3 (192.168.10.12): kubernetes-node
   * k8s-cluster-4 (192.168.10.11): kubernetes-node
   * k8s-cluster-5 (192.168.10.10): kubernetes-node
 
-## Connect and update each VMs
+### Connect and update each VMs
 On every VM, connected throught ssh and run
 ```bash
 box:~ user$ ssh centos@<my-ip>
@@ -63,7 +64,7 @@ You also need a hosts file looks like
 ```
 
 ## NFS infrastructure
-## Configure NFS server
+  ### Configure NFS server
 *Note: see https://www.server-world.info/en/note?os=CentOS_7&p=nfs*
 ```bash
 [root@k8s-cluster-1 ~]# echo "/mnt *(rw,no_root_squash)" > /etc/exports
@@ -74,7 +75,7 @@ You also need a hosts file looks like
 ```
 **Warning: You should be careful with /etc/exports syntax. You should NOT have space between options**
 
-## Test NFS server
+  ### Test NFS server
 ```bash
 [root@k8s-cluster-2 ~]# mount -t nfs 192.168.10.14:/mnt /mnt
 [root@k8s-cluster-2 ~]# df |grep mnt
