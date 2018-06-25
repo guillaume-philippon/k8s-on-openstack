@@ -70,6 +70,7 @@ You also need a hosts file looks like
 [root@k8s-cluster-1 ~]# systemctl enable rpcbind nfs-server
 [root@k8s-cluster-1 ~]# systemctl restart rpcbind nfs-server
 [root@k8s-cluster-1 ~]# mkdir /mnt/binderhub
+[root@k8s-cluster-1 ~]# chmod gou+rwx /mnt/binderhub
 ```
 **Warning: You should be careful with /etc/exports syntax. You should NOT have space between options**
 
