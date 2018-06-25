@@ -289,7 +289,7 @@ spec:
     storage: 1Gi
   nfs:
     server: 192.168.10.14
-    path: "/mnt/binder"
+    path: "/mnt/binderhub"
 ```
 And now launch it
 ```bash
