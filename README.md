@@ -238,6 +238,7 @@ registry:
 ```
 
 #### Config.yaml
+*Note: enabling registry break binderhub. To allow binderhub you need to disable registry*
 ```yaml
 registry:
   enabled: true
@@ -258,6 +259,7 @@ binderhub:
   service:
     type: NodePort
 ```
+
 #### Load binderhub
 ```bash
 [root@k8s-cluster-2 ~]# helm repo add jupyterhub https://jupyterhub.github.io/helm-chart
@@ -292,6 +294,11 @@ spec:
 And now launch it
 ```bash
 [root@k8s-cluster-2 ~]# kubectl apply -f hub-db-dir.yaml
+```
+
+To modify binderhub configuration you need to user helm
+```bash
+[root@k8s-cluster-2 ~]# helm upgrade binder jupyterhub/binderhub --version=v0.1.0-856e3e6 -f secret.yaml -f config.yaml
 ```
 
 ## Configure haproxy
