@@ -1,6 +1,6 @@
 # k8s-on-openstack
 
-## Start OpenStack Virtual Machine
+## I. Start OpenStack Virtual Machine
 *Note: Starting VM and retrieve information about can be done on keystone portal instead of CLI interface*
 
   ### Check your openstack environnement
@@ -63,7 +63,7 @@ You also need a hosts file looks like
 192.168.10.10 k8s-cluster-5
 ```
 
-## NFS infrastructure
+## II. NFS infrastructure
   ### Configure NFS server
 *Note: see https://www.server-world.info/en/note?os=CentOS_7&p=nfs*
 ```bash
@@ -83,7 +83,7 @@ You also need a hosts file looks like
 [root@k8s-cluster-2 ~]# umount /mnt
 ```
 
-## Configure kubernetes
+## III. Configure kubernetes
 ### Installing docker (k8s-cluster-2 to k8s-cluster-5)
 *Note: see https://docs.docker.com/install/linux/docker-ce/centos/#install-docker-ce*
 ```bash
@@ -303,7 +303,7 @@ To modify binderhub configuration you need to user helm
 [root@k8s-cluster-2 ~]# helm upgrade binder jupyterhub/binderhub --version=v0.1.0-856e3e6 -f secret.yaml -f config.yaml
 ```
 
-## Configure haproxy
+## IV. Configure haproxy
 We now need to configure haproxy to access to binderhub. On k8s master note proxy-public and binder port used
 ```bash
 [root@k8s-cluster-2 ~]# kubectl get service | grep 'binder\|public''
